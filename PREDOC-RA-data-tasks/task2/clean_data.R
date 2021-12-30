@@ -1,2 +1,2 @@
-b = 2
-print(b)
+c = 2
+print(c)
