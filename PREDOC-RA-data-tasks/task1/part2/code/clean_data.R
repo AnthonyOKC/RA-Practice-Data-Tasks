@@ -1,27 +1,16 @@
 # Load Necessary Packages
-if (!require("pacman")) install.packages("pacman")
-pacman::p_load(
-tidyverse
-)
+if (!require("tidyverse")) install.packages("tidyverse")
 
 # Import Data
-data = read_csv(file = "input/scp-1205.csv",
-                # Relabel Columns
-                col_names = c('countyname',
-                              'state',
-                              'contract',
-                              'healthplanname',
-                              'typeofplan',
-                              'countyssa',
-                              'eligibles',
-                              'enrollees',
-                              'penetration',
-                              'ABrate'),
-                # Override Incorrect Column Types
-                col_types = cols(countyssa = col_number(),
-                                 ABrate = col_number())
-                )
-
+data <-
+  read_csv(file = "input/scp-1205.csv",
+           # Relabel Columns
+           col_names = c('countyname', 'state', 'contract', 'healthplanname',
+                         'typeofplan', 'countyssa', 'eligibles', 'enrollees',
+                         'penetration', 'ABrate'),
+           # Override Incorrect Column Types
+           col_types = cols(countyssa = col_number(), ABrate = col_number())
+           )
 # Replace NAs with zeroes.
 data$eligibles <- replace_na(data$eligibles, 0)
 data$enrollees <- replace_na(data$enrollees, 0)
@@ -42,15 +31,11 @@ data <-
         # Number of individuals in the county with a MA health plan.
         totalenrollees = sum(enrollees)
         ) %>%
-    # New Variable:
-    # Number of individuals in the county enrolled in a MA plan.
-    mutate(totalpenetration = 100 * totalenrollees / eligibles) 
-
-# Replace 'totalpenetration' NaN's with zeroes.
+    # Percent of individuals in the county enrolled in a MA plan.
+    mutate(totalpenetration = 100 * totalenrollees / eligibles) %>% 
+    # Sort by state then county.
+    arrange(state, countyname)
 data$totalpenetration <- replace_na(data$totalpenetration, 0)
-
-# Sort by state then county.
-data <- data[order(data$state, data$countyname),]
 
 # Filter for counties with 'state' codes NOT in:
   # U.S. territories:
@@ -63,7 +48,9 @@ data <- data %>% filter(!(state %in% c("AS","PR","GU", "VI", "99", NA)))
   # Two counties, 'Manassas Park City' and 'Broomfield', are outliers in terms of 
   # 'totalpenetration.' Their values of Inf and 162 mean that more enrolled individuals
   # are enrolled in MA plans than are eligible for them. I opt to cap their penetration
-  # at 100 to reflect that they must be eligible if they are enrolled.
+  # at 100 to reflect the fact that they must be eligible if they are enrolled.
+   # Note: This could also be indicative of a clerical error with 'eligible' or of
+   # fraud among Medicare enrollees.
 data$totalpenetration[data$countyname %in% c('MANASSAS PARK CITY', 'BROOMFIELD')] <- 100
 
 # Export data
