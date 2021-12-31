@@ -22,18 +22,12 @@ data <-
     # Set countyname as the 'Key' Variable
     # and retain old variables that are consistent with county.
     group_by(countyname, state, countyssa, eligibles) %>% 
-    summarise(
-        # Add New Variables:
-        # Number of health plans with more than 10 enrollees.
-        numberofplans1 = length(contract[enrollees > 10]),
-        # Number of health plans with penetration > 0.5.
-        numberofplans2 = length(contract[penetration > 0.5]),
-        # Number of individuals in the county with a MA health plan.
-        totalenrollees = sum(enrollees)
-        ) %>%
-    # Percent of individuals in the county enrolled in a MA plan.
-    mutate(totalpenetration = 100 * totalenrollees / eligibles) %>% 
-    # Sort by state then county.
+    # Add New Variables:
+    summarise(numberofplans1 = length(contract[enrollees > 10]), # Number of health plans with more than 10 enrollees.
+              numberofplans2 = length(contract[penetration > 0.5]), # plans with penetration > 0.5.
+              totalenrollees = sum(enrollees) # Number of individuals in the county with a MA health plan.
+              ) %>% 
+    mutate(totalpenetration = 100 * totalenrollees / eligibles) %>%  # Percent of individuals in the county enrolled in a MA plan.
     arrange(state, countyname)
 data$totalpenetration <- replace_na(data$totalpenetration, 0)
 
@@ -53,5 +47,5 @@ data <- data %>% filter(!(state %in% c("AS","PR","GU", "VI", "99", NA)))
    # fraud among Medicare enrollees.
 data$totalpenetration[data$countyname %in% c('MANASSAS PARK CITY', 'BROOMFIELD')] <- 100
 
-# Export data
+# Export Data
 write_csv(data, file = 'output/scp-1205_clean.csv')
