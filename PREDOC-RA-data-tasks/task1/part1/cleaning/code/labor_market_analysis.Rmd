@@ -1,0 +1,169 @@
+---
+title: "Labor Market Analysis Task"
+author: "Anthony Flores"
+date: "1/6/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE, warning = FALSE,message = FALSE)
+```
+
+```{r}
+# Load Necessary Packages
+if (!require("pacman")) install.packages("pacman")
+p_load(
+    "Cairo",
+    "tidyverse",
+    "haven",
+    "ggthemes",
+    "scales",
+    # For working with date-times
+    "lubridate",
+    # Weighted Functions
+    "Hmisc")
+```
+
+```{r}
+# Import Data
+data <- read_dta(file = "../input/cps_wages_LFP.dta")
+```
+
+# Introduction
+
+# Key Trends for Skilled and Unskilled Workers, 1976 - 2015
+
+The following results reveal that the wage gap between skilled and
+unskilled workers has been steadily increasing over the period. The gap
+in labor force participation between the two skill groups also increased
+substantially but not as steadily. Most of the increase in the gap
+occurred in the 90s.
+
+```{r}
+compute_trends <- function(data) {
+    data %>% 
+    group_by(year, month) %>% 
+    summarise(avg_wage = wtd.mean(wage, weights = wtsupp),
+              lfp = sum(wtsupp[lfp == 1 & !is.na(lfp)]) /
+                    sum(wtsupp[!is.na(lfp)])
+              ) %>% 
+    mutate(date = make_datetime(year, month))
+}
+trend_data <- 
+    # Skilled Workers
+    data %>% 
+    filter(educ >= 73 & educ != 999) %>% # Education is high school diploma equivalent or higher.
+    compute_trends() %>% 
+    mutate(skill = "Skilled") %>% 
+    # Unskilled Workers
+    rbind(data %>%
+          filter(educ < 73) %>% # Education is below high school diploma equivalent.
+          compute_trends() %>% 
+          mutate(skill = "Unskilled"))
+```
+
+## Wage Trends
+
+```{r}
+trend_data %>% 
+    ggplot(aes(x = date, y = avg_wage)) +
+    geom_line(aes(color = skill, group = skill), size = 2) +
+    labs(title = "Average Wage Trends, 1976 - 2015", color = "Worker Skill") +
+    scale_y_continuous(labels = label_dollar()) +
+    theme_fivethirtyeight()
+```
+
+## Labor Force Participation (LFP) Trends
+
+```{r}
+trend_data %>% 
+    ggplot(aes(x = date, y = lfp)) +
+    geom_line(aes(color = skill, group = skill), size = 2) +
+    labs(title = "Labor Force Participation Trends, 1976 - 2015", color = "Worker Skill") +
+    scale_y_continuous(labels = label_percent()) +
+    theme_fivethirtyeight()
+```
+
+## Labor Force Participation Trends Among Men Older than 25
+
+The following analysis examines labor force participation trends among
+the following groups: (1) Unskilled vs Skilled, (2) Male vs Female, (3)
+Non-Hispanic White vs Black. In the 1976 - 2015 period, \_\_\_
+experienced the largest change in LFP.
+
+```{r,message=FALSE}
+olderthan25_trend_data <- 
+    # Skilled Workers
+    data %>% 
+    filter(educ >= 73 & educ != 999 & age > 25) %>% 
+    compute_trends() %>% 
+    mutate(skill = "Skilled", chart_group = 1) %>% 
+    # Unskilled Workers
+    rbind(
+        data %>%
+          filter(educ < 73 & age > 25) %>%
+          compute_trends() %>% 
+          mutate(skill = "Unskilled", chart_group = 1),
+        # Male Workers
+        data %>% 
+          filter(sex == 1 & age > 25) %>%
+          compute_trends() %>% 
+          mutate(gender = "Male", chart_group = 2),
+        # Female Workers
+        data %>% 
+          filter(sex == 2 & age > 25) %>%
+          compute_trends() %>% 
+          mutate(gender = "Female", chart_group = 2),
+        # Non-Hispanic White Workers
+        data %>% 
+          filter(race == 100 & hispan == 0 & age > 25) %>%
+          compute_trends() %>% 
+          mutate(race = "White", chart_group = 3),
+        # Black Workers
+        data %>% 
+          filter(race == 200 & age > 25) %>%
+          compute_trends() %>% 
+          mutate(race = "Black", chart_group = 3)
+        ) %>%
+    mutate(chart_group = factor(chart_group, labels = c("Skill", "Gender", "Race")))
+```
+
+```{r, include=FALSE}
+olderthan25_trend_data %>% 
+    ggplot(aes(x = date, y = lfp)) +
+    geom_line(data = ~ filter(.x, !is.na(skill)),
+              aes(color = skill, group = skill), size = 2) +
+    geom_line(data = ~ filter(.x, !is.na(gender)),
+              aes(color = gender, group = gender), size = 2) +
+    geom_line(data = ~ filter(.x, !is.na(race)),
+              aes(color = race, group = race), size = 2) +
+    labs(title = "Labor Force Participation Trends, 1976 - 2915") +
+    scale_y_continuous(labels = label_percent()) +
+    scale_color_discrete(limits = c("Skilled", "Unskilled", "Male", "Female",
+                                    "White", "Black")) + 
+    theme_fivethirtyeight()
+```
+
+```{r}
+olderthan25_trend_data %>% 
+    ggplot(aes(x = date, y = lfp)) +
+    geom_line(data = ~ filter(.x, !is.na(skill)),
+              aes(color = skill, group = skill), size = 1.4) +
+    geom_line(data = ~ filter(.x, !is.na(gender)),
+              aes(color = gender, group = gender), size = 1.4) +
+    geom_line(data = ~ filter(.x, !is.na(race)),
+              aes(color = race, group = race), size = 1.4) +
+    labs(title = "Labor Force Participation Trends",
+         subtitle = "Among Those Older Than 25, 1976 - 2015",
+         color = "Group") +
+    scale_y_continuous(labels = label_percent()) +
+    scale_color_discrete(limits = c("Skilled", "Unskilled", "Male", "Female",
+                                    "White", "Black")) + 
+    theme_fivethirtyeight() +
+    facet_wrap(~chart_group, labeller = "label_parsed")
+```
+
+# Discussion
+
+\_\_ may explain why \_\_ experienced the largest change in LFP. In
+order to test this we might gather \_\_\_.
